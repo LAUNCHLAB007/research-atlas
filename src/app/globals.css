@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  --color-canvas: #F6F8FB;
+  --color-panel: #FFFFFF;
+  --color-inset: #EDF3F5;
+
+  --color-text-primary: #18253D;
+  --color-text-secondary: #586679;
+  --color-border: #DCE5EB;
+
+  --color-accent: #197A83;
+  --color-accent-hover: #155F67;
+  --color-accent-selected: #DDF0F0;
+
+  --color-info: #2D65A2;
+  --color-success: #247A56;
+  --color-caution: #A86A13;
+  --color-error: #B43E46;
+
+  --color-topic-neuro: #6E58C9;
+  --color-topic-bio: #2E8B57;
+  --color-topic-aging: #B8860B;
+  --color-topic-ai: #2D65A2;
+  --color-topic-eng: #586679;
+
+  --radius-card: 12px;
+  --radius-dialog: 16px;
+}
+
+@theme inline {
+  --color-canvas: var(--color-canvas);
+  --color-panel: var(--color-panel);
+  --color-inset: var(--color-inset);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-border: var(--color-border);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-selected: var(--color-accent-selected);
+  --color-info: var(--color-info);
+  --color-success: var(--color-success);
+  --color-caution: var(--color-caution);
+  --color-error: var(--color-error);
+  --color-topic-neuro: var(--color-topic-neuro);
+  --color-topic-bio: var(--color-topic-bio);
+  --color-topic-aging: var(--color-topic-aging);
+  --color-topic-ai: var(--color-topic-ai);
+  --color-topic-eng: var(--color-topic-eng);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
