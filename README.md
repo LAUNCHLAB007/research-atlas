@@ -1,36 +1,100 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Research Atlas
 
-## Getting Started
+A private, personal scientific exploration environment that connects curiosity, learning, evidence,
+invention and testing — six workspaces (Explore, Classroom, Research, Build, Test, Library) over five
+fixed learning domains (Neuroscience & Cognition, Biological Sciences, Aging & Regenerative Science,
+AI & Computational Science, Engineering & Technology).
 
-First, run the development server:
+Live: https://research-atlas-ten.vercel.app
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Status
+
+This is the **P0** build: auth, the app shell, and core CRUD across all six workspaces, wired to a real
+Supabase project with row-level security. AI-assisted modes (Explore with me, Teach me, Research critic,
+etc.) are **not implemented yet** — every AI-mode panel in the UI is a labeled placeholder. See
+`Research_Atlas_Detailed_Architecture_Revised` for the full P0/P1/P2 phase breakdown this build follows.
+
+## Tech stack
+
+- **Next.js 16** (App Router, TypeScript, Turbopack)
+- **Tailwind CSS v4** — design tokens live in `src/app/globals.css`
+- **Supabase** — Postgres, Auth, Row Level Security, private Storage
+- **Vercel** — hosting, auto-deploys from GitHub pushes to `main`
+
+## Project structure
+
+```
+src/
+  app/
+    (auth)/login, (auth)/auth/callback   — sign in/up, email confirmation callback
+    (app)/...                            — every workspace route, behind auth (see src/app/(app)/layout.tsx)
+  components/
+    shell/                               — sidebar, top bar, quick capture, account menu
+    shared/                              — RecordCard, StatusBadge, TopicPicker, FileUploader, etc.
+    explore/, classroom/, research/, build/, test/, library/  — per-workspace forms
+  lib/
+    supabase/                            — browser/server/middleware Supabase clients
+    data/                                — typed read queries, one module per workspace
+    actions/                             — server actions (mutations), one module per workspace
+    validation/schemas.ts                — Zod schemas matching the SQL CHECK constraints
+    types/domain.ts                      — hand types mirroring the schema; database.types.ts is generated
+    constants/                           — the five fixed domains, workspace nav
+supabase/migrations/                     — schema history; the initial schema is 00000000000001_schema.sql
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Local development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Copy `.env.local.example` to `.env.local` and fill in your Supabase project's URL and **anon public**
+   key (Supabase dashboard → Project Settings → API). The anon key is safe to expose client-side — it's
+   the whole point of that key, protected by RLS.
+3. Run the dev server:
+   ```bash
+   npm run dev
+   ```
+   Open http://localhost:3000.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Database schema
 
-## Learn More
+The schema lives in `supabase/migrations/`. To apply it to a Supabase project via the CLI:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npx supabase login
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+After schema changes, regenerate types:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npx supabase gen types typescript --linked > src/lib/types/database.types.ts
+```
 
-## Deploy on Vercel
+Never rename a migration file to end in `_init` — the Supabase CLI treats that as reserved and silently
+skips it.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deployment
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Deploys to Vercel on every push to `main` (GitHub repo: `LAUNCHLAB007/research-atlas`). Required
+environment variables on Vercel (Project Settings → Environment Variables):
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — add with `--type config`, since it's meant to be public, not `--type secret`
+
+To deploy manually:
+
+```bash
+npx vercel --prod
+```
+
+## What's next (not yet built)
+
+Per the architecture doc's phase plan:
+
+- **P1**: selectable AI modes (Explore/Teach/Read/Research critic/Design/Test with me), source-grounded
+  paper assistance, richer question exploration, fuller revision/audit history.
+- **P2**: interactive knowledge graph, optional repo/notebook integrations, sandboxed code execution,
+  collaboration.

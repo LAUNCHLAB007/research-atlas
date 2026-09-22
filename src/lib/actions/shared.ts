@@ -23,7 +23,18 @@ export async function linkTopics(
   recordId: string
 ) {
   if (topicIds.length === 0) return;
-  const rows = topicIds.map((topic_id) => ({ topic_id, [field]: recordId }));
+  const rows = topicIds.map((topic_id) => {
+    const row: {
+      topic_id: string;
+      entry_id?: string;
+      source_id?: string;
+      concept_id?: string;
+      research_project_id?: string;
+      build_project_id?: string;
+    } = { topic_id };
+    row[field] = recordId;
+    return row;
+  });
   const { error } = await supabase.from("topic_links").insert(rows);
   if (error) throw new ActionError(error.message);
 }
