@@ -47,7 +47,8 @@ export async function sendExploreMessage(entryId: string, userText: string) {
     try {
       response = await anthropic.messages.create({
         model: EXPLORE_MODEL,
-        max_tokens: 2048,
+        max_tokens: 4096,
+        output_config: { effort: "medium" },
         system: buildExploreSystemPrompt(entry.original_body),
         messages: history,
       });
