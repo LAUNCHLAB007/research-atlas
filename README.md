@@ -10,9 +10,11 @@ Live: https://research-atlas-ten.vercel.app
 ## Status
 
 This is the **P0** build: auth, the app shell, and core CRUD across all six workspaces, wired to a real
-Supabase project with row-level security. AI-assisted modes (Explore with me, Teach me, Research critic,
-etc.) are **not implemented yet** — every AI-mode panel in the UI is a labeled placeholder. See
-`Research_Atlas_Detailed_Architecture_Revised` for the full P0/P1/P2 phase breakdown this build follows.
+Supabase project with row-level security. One P1 feature is implemented early: **Explore with me** — a
+real AI chat (Claude, via the Anthropic API) on each Question Explorer page that suggests concrete
+topics to learn, one click from being added to Classroom or Library. The other AI modes (Teach me,
+Research critic, etc.) are still placeholders. See `Research_Atlas_Detailed_Architecture_Revised` for
+the full P0/P1/P2 phase breakdown this build follows.
 
 ## Tech stack
 
@@ -50,7 +52,8 @@ supabase/migrations/                     — schema history; the initial schema 
    ```
 2. Copy `.env.local.example` to `.env.local` and fill in your Supabase project's URL and **anon public**
    key (Supabase dashboard → Project Settings → API). The anon key is safe to expose client-side — it's
-   the whole point of that key, protected by RLS.
+   the whole point of that key, protected by RLS. Also add `ANTHROPIC_API_KEY` (from
+   console.anthropic.com) to enable the Explore chat — this one is a real secret, keep it server-only.
 3. Run the dev server:
    ```bash
    npm run dev

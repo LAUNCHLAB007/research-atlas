@@ -2,9 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getEntry, listEntryRevisions } from "@/lib/data/entries";
 import { listTopicLinksForRecord, getTopic } from "@/lib/data/topics";
+import { getExploreSessionForEntry, listMessages } from "@/lib/data/ai";
 import { ProvenanceBadge } from "@/components/shared/ProvenanceBadge";
 import { EntryEditor } from "@/components/explore/EntryEditor";
 import { PromoteToResearchButton } from "@/components/explore/PromoteToResearchButton";
+import { AiExplorePanel } from "@/components/explore/AiExplorePanel";
 
 export default async function QuestionExplorerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,6 +18,9 @@ export default async function QuestionExplorerPage({ params }: { params: Promise
     listTopicLinksForRecord("entry_id", entry.id),
   ]);
   const topics = await Promise.all(topicLinks.map((l) => getTopic(l.topic_id)));
+
+  const session = await getExploreSessionForEntry(entry.id);
+  const initialMessages = session ? await listMessages(session.id) : [];
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -90,12 +95,8 @@ export default async function QuestionExplorerPage({ params }: { params: Promise
         )}
       </div>
 
-      <aside className="rounded-[var(--radius-card)] border border-dashed border-border bg-panel p-4">
-        <h2 className="text-sm font-medium text-text-primary">AI-guided exploration</h2>
-        <p className="mt-2 text-sm text-text-secondary">
-          Selectable AI modes (definitions, alternative explanations, follow-up questions) ship in a later phase.
-          Everything you save here stays a plain, source-attributed record until then.
-        </p>
+      <aside className="min-h-[420px] lg:sticky lg:top-20 lg:h-[calc(100vh-6rem)]">
+        <AiExplorePanel entryId={entry.id} initialMessages={initialMessages} />
       </aside>
     </div>
   );
