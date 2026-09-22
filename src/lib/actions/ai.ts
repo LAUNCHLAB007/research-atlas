@@ -4,10 +4,23 @@ import { revalidatePath } from "next/cache";
 import Anthropic from "@anthropic-ai/sdk";
 import { anthropic, EXPLORE_MODEL } from "@/lib/ai/client";
 import { buildExploreSystemPrompt, parseExploreResponse, type SuggestedTopic } from "@/lib/ai/explore";
+import { buildSuggestQuestionsPrompt, parseQuestionsResponse } from "@/lib/ai/suggestQuestions";
 import { requireUser, runAction, ActionError } from "./shared";
 import { getExploreSessionForEntry, listMessages } from "@/lib/data/ai";
 import { getEntry } from "@/lib/data/entries";
-import type { AiSession } from "@/lib/types/domain";
+import { ensureRootTopic } from "./explore";
+import { domainById } from "@/lib/constants/domains";
+import type { AiSession, LearningDomainId } from "@/lib/types/domain";
+
+function toActionError(err: unknown): ActionError {
+  if (err instanceof Anthropic.AuthenticationError) {
+    return new ActionError("The AI is not configured yet (missing or invalid ANTHROPIC_API_KEY).");
+  }
+  if (err instanceof Anthropic.RateLimitError) {
+    return new ActionError("The AI is rate-limited right now — try again in a moment.");
+  }
+  return new ActionError(err instanceof Error ? err.message : "The AI request failed.");
+}
 
 export async function sendExploreMessage(entryId: string, userText: string) {
   return runAction(async () => {
@@ -53,13 +66,7 @@ export async function sendExploreMessage(entryId: string, userText: string) {
         messages: history,
       });
     } catch (err) {
-      if (err instanceof Anthropic.AuthenticationError) {
-        throw new ActionError("The AI is not configured yet (missing or invalid ANTHROPIC_API_KEY).");
-      }
-      if (err instanceof Anthropic.RateLimitError) {
-        throw new ActionError("The AI is rate-limited right now — try again in a moment.");
-      }
-      throw new ActionError(err instanceof Error ? err.message : "The AI request failed.");
+      throw toActionError(err);
     }
 
     const rawText = response.content
@@ -94,6 +101,53 @@ export async function addSuggestedTopicToClassroom(topic: SuggestedTopic) {
     if (error || !data) throw new ActionError(error?.message ?? "Could not add to Classroom.");
     revalidatePath("/classroom");
     return data;
+  });
+}
+
+export async function suggestDomainQuestions(domainId: LearningDomainId) {
+  return runAction(async () => {
+    await requireUser();
+    const domain = domainById(domainId);
+
+    let response;
+    try {
+      response = await anthropic.messages.create({
+        model: EXPLORE_MODEL,
+        max_tokens: 1024,
+        output_config: { effort: "medium" },
+        messages: [{ role: "user", content: buildSuggestQuestionsPrompt(domain.name, domain.description) }],
+      });
+    } catch (err) {
+      throw toActionError(err);
+    }
+
+    const rawText = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("\n");
+
+    const questions = parseQuestionsResponse(rawText);
+    if (questions.length === 0) throw new ActionError("Could not generate suggestions — try again.");
+    return questions;
+  });
+}
+
+export async function saveAndExploreQuestion(questionText: string, domainId: LearningDomainId) {
+  return runAction(async () => {
+    const { supabase } = await requireUser();
+    const rootTopic = await ensureRootTopic(domainId, domainById(domainId).name);
+
+    const { data: entry, error } = await supabase
+      .from("entries")
+      .insert({ kind: "question", body: questionText, original_body: questionText })
+      .select()
+      .single();
+    if (error || !entry) throw new ActionError(error?.message ?? "Could not save the question.");
+
+    await supabase.from("topic_links").insert({ topic_id: rootTopic.id, entry_id: entry.id });
+
+    revalidatePath("/explore");
+    return entry;
   });
 }
 

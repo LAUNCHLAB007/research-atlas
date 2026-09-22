@@ -5,6 +5,7 @@ import { listTopicsByDomain, getTopic, listSubtopics, resolveTopicLinkItems } fr
 import { LinkedRecords } from "@/components/shared/LinkedRecords";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { NewTopicForm } from "@/components/explore/NewTopicForm";
+import { SuggestQuestionsButton } from "@/components/explore/SuggestQuestionsButton";
 import type { LearningDomainId } from "@/lib/types/domain";
 
 const DOMAIN_IDS = new Set([1, 2, 3, 4, 5]);
@@ -25,6 +26,13 @@ export default async function TopicLandingPage({ params }: { params: Promise<{ i
           <h1 className="text-2xl font-semibold text-text-primary">{domain.name}</h1>
         </div>
         <p className="max-w-2xl text-sm text-text-secondary">{domain.description}</p>
+
+        <section>
+          <h2 className="text-lg font-medium text-text-primary">Questions to investigate</h2>
+          <div className="mt-3">
+            <SuggestQuestionsButton domainId={domainId} />
+          </div>
+        </section>
 
         <section>
           <div className="flex items-center justify-between">
