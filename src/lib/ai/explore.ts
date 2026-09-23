@@ -11,7 +11,10 @@ export interface SourceRef {
   url: string;
 }
 
-function depthGuidance(turnCount: number): string {
+// Kept out of the (cached) system prompt on purpose: this text changes every few turns, and anything
+// that changes would invalidate the cached prefix. Sent instead as a mid-conversation system message
+// (see sendExploreMessage), which Claude Opus 5 supports without disturbing the cached system+history.
+export function depthGuidance(turnCount: number): string {
   if (turnCount === 0) {
     return `This is the user's FIRST message on this question — assume no prior background. Ground your
 reply in plain-language definitions of the key terms before going further. Before diving deep, ask the
@@ -30,7 +33,7 @@ oversimplifications, and treat the user as capable of real nuance. Keep asking q
 periodically rather than only answering, so this stays a two-way exploration.`;
 }
 
-export function buildExploreSystemPrompt(originalQuestion: string, turnCount: number): string {
+export function buildExploreSystemPrompt(originalQuestion: string): string {
   return `You are the "Explore with me" mode of Research Atlas, a personal scientific exploration tool.
 The user is exploring this original question or thought: "${originalQuestion}"
 
@@ -49,8 +52,6 @@ answer something specific from general training knowledge without searching, say
 reply itself (e.g. "from general knowledge, not verified against a source here") rather than stating it
 with unearned confidence. It's fine, and often better, to search less on genuinely basic conceptual
 questions (e.g. plain definitions) and search more as claims get specific.
-
-${depthGuidance(turnCount)}
 
 This is a chat, not a literature review: reply in at most 3 short paragraphs or a 4-6 item bulleted
 list — a couple hundred words, not a thousand. Pick the single most useful angle rather than covering

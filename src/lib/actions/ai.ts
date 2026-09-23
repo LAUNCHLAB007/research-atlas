@@ -5,6 +5,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { anthropic, EXPLORE_MODEL } from "@/lib/ai/client";
 import {
   buildExploreSystemPrompt,
+  depthGuidance,
   parseExploreResponse,
   appendSourcesMarker,
   type SuggestedTopic,
@@ -33,6 +34,17 @@ function extractWebSources(content: Anthropic.ContentBlock[]): SourceRef[] {
   }
   const seen = new Set<string>();
   return sources.filter((s) => (seen.has(s.url) ? false : (seen.add(s.url), true)));
+}
+
+// Visible in Vercel's function logs (Project > Logs). No Admin API key is configured for this project,
+// so this is the cheapest way to see the real cache hit rate and token split per call.
+function logUsage(label: string, usage: Anthropic.Usage) {
+  console.log(`[ai:${label}]`, {
+    input: usage.input_tokens,
+    cache_read: usage.cache_read_input_tokens ?? 0,
+    cache_write: usage.cache_creation_input_tokens ?? 0,
+    output: usage.output_tokens,
+  });
 }
 
 function toActionError(err: unknown): ActionError {
@@ -71,12 +83,26 @@ export async function sendExploreMessage(entryId: string, userText: string) {
       .insert({ session_id: session!.id, role: "user", body: userText });
     if (userInsertError) throw new ActionError(userInsertError.message);
 
+    // Prior turns as plain text, oldest first — byte-identical to what was sent last request, so this
+    // whole prefix can be served from cache instead of reprocessed. A cache_control breakpoint on the
+    // last one caches everything up to and including it (cheaper AND faster on turn 2+ of every
+    // conversation — without this, a 10-turn chat reprocesses turn 1's tokens roughly 10 times over).
+    const priorTurns: Anthropic.MessageParam[] = priorMessages.map((m) => ({
+      role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+      content: m.body,
+    }));
+    if (priorTurns.length > 0) {
+      const last = priorTurns[priorTurns.length - 1];
+      last.content = [{ type: "text", text: last.content as string, cache_control: { type: "ephemeral", ttl: "1h" } }];
+    }
+
+    // The turn-dependent coaching (depthGuidance) is sent as a mid-conversation system message instead
+    // of inside the cached system prompt — it changes every few turns, and anything that changes would
+    // invalidate the cache above. It's derived fresh each request, never stored in ai_messages.
     const history: Anthropic.MessageParam[] = [
-      ...priorMessages.map((m) => ({
-        role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
-        content: m.body,
-      })),
+      ...priorTurns,
       { role: "user", content: userText },
+      { role: "system", content: depthGuidance(priorMessages.length) } as Anthropic.MessageParam,
     ];
 
     let response;
@@ -85,13 +111,21 @@ export async function sendExploreMessage(entryId: string, userText: string) {
         model: EXPLORE_MODEL,
         max_tokens: 4096,
         output_config: { effort: "medium" },
-        system: buildExploreSystemPrompt(entry.original_body, priorMessages.length),
+        system: [
+          {
+            type: "text",
+            text: buildExploreSystemPrompt(entry.original_body),
+            cache_control: { type: "ephemeral", ttl: "1h" },
+          },
+        ],
         messages: history,
         tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }],
       });
     } catch (err) {
       throw toActionError(err);
     }
+
+    logUsage("explore", response.usage);
 
     const rawText = response.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -148,6 +182,7 @@ export async function suggestDomainQuestions(domainId: LearningDomainId) {
     } catch (err) {
       throw toActionError(err);
     }
+    logUsage("suggest-questions", response.usage);
 
     const rawText = response.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
