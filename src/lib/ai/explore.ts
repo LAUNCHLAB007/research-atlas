@@ -1,8 +1,14 @@
 const TOPICS_MARKER = "SUGGESTED_TOPICS_JSON:";
+const SOURCES_MARKER = "SOURCES_JSON:";
 
 export interface SuggestedTopic {
   label: string;
   description: string;
+}
+
+export interface SourceRef {
+  title: string;
+  url: string;
 }
 
 function depthGuidance(turnCount: number): string {
@@ -32,8 +38,17 @@ You are a Socratic exploration partner, not a lookup service. Your job: clarify 
 alternative explanations, identify what is genuinely unknown or uncertain, and propose specific,
 concrete topics worth learning next — but you do this BY CONVERSING, not by lecturing. Ask the user
 real questions and build on their answers; don't just dump information and stop. Be precise and
-scientifically grounded. Clearly flag speculation as speculation. Do not claim a simulation or your own
-reasoning is biological or experimental evidence.
+scientifically grounded. Do not claim a simulation or your own reasoning is biological or experimental
+evidence.
+
+Accuracy matters more than fluency here — this feeds a real research notebook. You have a web_search
+tool. Use it whenever you're about to cite a specific finding, a named study, an author, a statistic, or
+any claim a reader might reasonably act on — do not name a paper, author, or number from memory and
+present it as though it's a live citation. If you use search results, that grounds the claim; if you
+answer something specific from general training knowledge without searching, say so plainly in the
+reply itself (e.g. "from general knowledge, not verified against a source here") rather than stating it
+with unearned confidence. It's fine, and often better, to search less on genuinely basic conceptual
+questions (e.g. plain definitions) and search more as claims get specific.
 
 ${depthGuidance(turnCount)}
 
@@ -53,26 +68,59 @@ Only suggest topics specific and concrete enough that the user could look up a c
 them directly — not vague areas.`;
 }
 
-export function parseExploreResponse(rawText: string): { body: string; topics: SuggestedTopic[] } {
-  const markerIndex = rawText.lastIndexOf(TOPICS_MARKER);
-  if (markerIndex === -1) {
-    return { body: rawText.trim(), topics: [] };
+// Sources are appended by our own server code from the API's actual search results, never generated
+// by the model — so what's shown as "Sources" is always something Claude's web_search tool really found.
+export function appendSourcesMarker(text: string, sources: SourceRef[]): string {
+  if (sources.length === 0) return text;
+  return `${text}\n${SOURCES_MARKER} ${JSON.stringify(sources)}`;
+}
+
+export function parseExploreResponse(rawText: string): {
+  body: string;
+  topics: SuggestedTopic[];
+  sources: SourceRef[];
+} {
+  const topicsIndex = rawText.lastIndexOf(TOPICS_MARKER);
+  if (topicsIndex === -1) {
+    return { body: rawText.trim(), topics: [], sources: [] };
   }
 
-  const body = rawText.slice(0, markerIndex).trim();
-  const jsonPart = rawText.slice(markerIndex + TOPICS_MARKER.length).trim();
+  const body = rawText.slice(0, topicsIndex).trim();
+  const afterTopics = rawText.slice(topicsIndex + TOPICS_MARKER.length);
 
+  const sourcesIndex = afterTopics.indexOf(SOURCES_MARKER);
+  const topicsJsonPart = (sourcesIndex === -1 ? afterTopics : afterTopics.slice(0, sourcesIndex)).trim();
+  const sourcesJsonPart = sourcesIndex === -1 ? "" : afterTopics.slice(sourcesIndex + SOURCES_MARKER.length).trim();
+
+  return {
+    body,
+    topics: parseTopicsJson(topicsJsonPart),
+    sources: parseSourcesJson(sourcesJsonPart),
+  };
+}
+
+function parseTopicsJson(jsonPart: string): SuggestedTopic[] {
   try {
     const parsed = JSON.parse(jsonPart);
-    if (!Array.isArray(parsed)) return { body, topics: [] };
-    const topics = parsed
+    if (!Array.isArray(parsed)) return [];
+    return parsed
       .filter(
         (t): t is SuggestedTopic =>
           t && typeof t.label === "string" && typeof t.description === "string"
       )
       .slice(0, 4);
-    return { body, topics };
   } catch {
-    return { body, topics: [] };
+    return [];
+  }
+}
+
+function parseSourcesJson(jsonPart: string): SourceRef[] {
+  if (!jsonPart) return [];
+  try {
+    const parsed = JSON.parse(jsonPart);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((s): s is SourceRef => s && typeof s.title === "string" && typeof s.url === "string");
+  } catch {
+    return [];
   }
 }

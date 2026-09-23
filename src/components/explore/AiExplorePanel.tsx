@@ -3,7 +3,7 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { sendExploreMessage, addSuggestedTopicToClassroom, addSuggestedTopicToLibrary } from "@/lib/actions/ai";
-import { parseExploreResponse, type SuggestedTopic } from "@/lib/ai/explore";
+import { parseExploreResponse, type SuggestedTopic, type SourceRef } from "@/lib/ai/explore";
 import { ProvenanceBadge } from "@/components/shared/ProvenanceBadge";
 import type { AiMessage } from "@/lib/types/domain";
 
@@ -11,6 +11,7 @@ interface DisplayMessage {
   id: string;
   role: "user" | "assistant";
   body: string;
+  sources: SourceRef[];
 }
 
 function toDisplayMessages(messages: AiMessage[]): DisplayMessage[] {
@@ -18,10 +19,10 @@ function toDisplayMessages(messages: AiMessage[]): DisplayMessage[] {
     .filter((m) => m.role !== "system_note")
     .map((m) => {
       if (m.role === "assistant") {
-        const { body } = parseExploreResponse(m.body);
-        return { id: m.id, role: "assistant" as const, body };
+        const { body, sources } = parseExploreResponse(m.body);
+        return { id: m.id, role: "assistant" as const, body, sources };
       }
-      return { id: m.id, role: "user" as const, body: m.body };
+      return { id: m.id, role: "user" as const, body: m.body, sources: [] };
     });
 }
 
@@ -56,7 +57,7 @@ export function AiExplorePanel({ entryId, initialMessages }: { entryId: string; 
     const text = input;
     setInput("");
     setError(null);
-    setMessages((prev) => [...prev, { id: `local-${Date.now()}`, role: "user", body: text }]);
+    setMessages((prev) => [...prev, { id: `local-${Date.now()}`, role: "user", body: text, sources: [] }]);
     setSending(true);
 
     const result = await sendExploreMessage(entryId, text);
@@ -66,7 +67,10 @@ export function AiExplorePanel({ entryId, initialMessages }: { entryId: string; 
       setError(result.error);
       return;
     }
-    setMessages((prev) => [...prev, { id: `assistant-${Date.now()}`, role: "assistant", body: result.data.body }]);
+    setMessages((prev) => [
+      ...prev,
+      { id: `assistant-${Date.now()}`, role: "assistant", body: result.data.body, sources: result.data.sources },
+    ]);
     if (result.data.topics.length > 0) {
       setTopics((prev) => dedupeTopics([...prev, ...result.data.topics]));
     }
@@ -110,6 +114,29 @@ export function AiExplorePanel({ entryId, initialMessages }: { entryId: string; 
             ) : (
               <div className="rounded-lg bg-inset px-3 py-2 text-sm text-text-primary">
                 <MarkdownMessage text={m.body} />
+                {m.sources.length > 0 ? (
+                  <div className="mt-2 border-t border-border/60 pt-2">
+                    <p className="text-xs font-medium text-text-secondary">Sources found via web search</p>
+                    <ul className="mt-1 space-y-0.5">
+                      {m.sources.map((s) => (
+                        <li key={s.url}>
+                          <a
+                            href={s.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-accent hover:underline"
+                          >
+                            {s.title}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="mt-2 border-t border-border/60 pt-2 text-xs italic text-text-secondary">
+                    Not checked against a live source — verify before relying on this.
+                  </p>
+                )}
               </div>
             )}
           </div>

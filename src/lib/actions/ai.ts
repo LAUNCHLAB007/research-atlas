@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import Anthropic from "@anthropic-ai/sdk";
 import { anthropic, EXPLORE_MODEL } from "@/lib/ai/client";
-import { buildExploreSystemPrompt, parseExploreResponse, type SuggestedTopic } from "@/lib/ai/explore";
+import {
+  buildExploreSystemPrompt,
+  parseExploreResponse,
+  appendSourcesMarker,
+  type SuggestedTopic,
+  type SourceRef,
+} from "@/lib/ai/explore";
 import { buildSuggestQuestionsPrompt, parseQuestionsResponse, levelFromEntryCount } from "@/lib/ai/suggestQuestions";
 import { requireUser, runAction, ActionError } from "./shared";
 import { getExploreSessionForEntry, listMessages } from "@/lib/data/ai";
@@ -12,6 +18,22 @@ import { ensureRootTopic } from "./explore";
 import { domainById } from "@/lib/constants/domains";
 import { countEntriesInDomain } from "@/lib/data/topics";
 import type { AiSession, LearningDomainId } from "@/lib/types/domain";
+
+function extractWebSources(content: Anthropic.ContentBlock[]): SourceRef[] {
+  const sources: SourceRef[] = [];
+  for (const block of content) {
+    if (block.type !== "web_search_tool_result") continue;
+    const result = block.content;
+    if (!Array.isArray(result)) continue; // an error object, not results
+    for (const item of result) {
+      if (item.type === "web_search_result") {
+        sources.push({ title: item.title, url: item.url });
+      }
+    }
+  }
+  const seen = new Set<string>();
+  return sources.filter((s) => (seen.has(s.url) ? false : (seen.add(s.url), true)));
+}
 
 function toActionError(err: unknown): ActionError {
   if (err instanceof Anthropic.AuthenticationError) {
@@ -65,6 +87,7 @@ export async function sendExploreMessage(entryId: string, userText: string) {
         output_config: { effort: "medium" },
         system: buildExploreSystemPrompt(entry.original_body, priorMessages.length),
         messages: history,
+        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }],
       });
     } catch (err) {
       throw toActionError(err);
@@ -74,10 +97,12 @@ export async function sendExploreMessage(entryId: string, userText: string) {
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)
       .join("\n");
+    const sources = extractWebSources(response.content);
+    const storedText = appendSourcesMarker(rawText, sources);
 
     const { data: assistantRow, error: assistantInsertError } = await supabase
       .from("ai_messages")
-      .insert({ session_id: session!.id, role: "assistant", body: rawText })
+      .insert({ session_id: session!.id, role: "assistant", body: storedText })
       .select()
       .single();
     if (assistantInsertError || !assistantRow) {
@@ -87,7 +112,7 @@ export async function sendExploreMessage(entryId: string, userText: string) {
     revalidatePath(`/explore/questions/${entryId}`);
 
     const { body, topics } = parseExploreResponse(rawText);
-    return { sessionId: session!.id, body, topics };
+    return { sessionId: session!.id, body, topics, sources };
   });
 }
 
