@@ -19,6 +19,7 @@ import { SourceCitation } from "@/components/shared/SourceCitation";
 import { NewHypothesisForm } from "@/components/research/NewHypothesisForm";
 import { NewExperimentPlanForm } from "@/components/research/NewExperimentPlanForm";
 import { NewNotebookEntryForm } from "@/components/research/NewNotebookEntryForm";
+import { CritiqueButton } from "@/components/research/CritiqueButton";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 const RESEARCH_STATUSES = ["exploring", "literature_review", "planning", "active", "paused", "completed", "archived"];
@@ -125,7 +126,10 @@ async function HypothesesSection({ projectId }: { projectId: string }) {
               {h.falsification_criteria && (
                 <p className="mt-1 text-xs text-text-secondary">Falsified if: {h.falsification_criteria}</p>
               )}
-              <p className="mt-1 text-xs text-text-secondary">Revision {h.revision}</p>
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-xs text-text-secondary">Revision {h.revision}</p>
+                <CritiqueButton kind="hypothesis" subjectId={h.id} />
+              </div>
             </li>
           ))}
         </ul>
@@ -155,6 +159,9 @@ async function ExperimentPlansSection({ projectId }: { projectId: string }) {
               {p.method && <p className="mt-1 text-sm text-text-secondary">Method: {p.method}</p>}
               {p.controls && <p className="mt-1 text-xs text-text-secondary">Controls: {p.controls}</p>}
               {p.measurement_plan && <p className="mt-1 text-xs text-text-secondary">Measurement: {p.measurement_plan}</p>}
+              <div className="mt-2">
+                <CritiqueButton kind="experiment_plan" subjectId={p.id} />
+              </div>
             </li>
           ))}
         </ul>

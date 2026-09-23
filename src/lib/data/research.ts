@@ -37,6 +37,20 @@ export async function listHypotheses(projectId: string): Promise<Hypothesis[]> {
   return data as Hypothesis[];
 }
 
+export async function getHypothesis(id: string): Promise<Hypothesis | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("hypotheses").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data as Hypothesis | null;
+}
+
+export async function getExperimentPlan(id: string): Promise<ExperimentPlan | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("experiment_plans").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data as ExperimentPlan | null;
+}
+
 export async function listExperimentPlans(projectId: string): Promise<ExperimentPlan[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

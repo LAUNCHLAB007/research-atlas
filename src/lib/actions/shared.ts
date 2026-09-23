@@ -1,6 +1,17 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 
 export class ActionError extends Error {}
+
+export function toActionError(err: unknown): ActionError {
+  if (err instanceof Anthropic.AuthenticationError) {
+    return new ActionError("The AI is not configured yet (missing or invalid ANTHROPIC_API_KEY).");
+  }
+  if (err instanceof Anthropic.RateLimitError) {
+    return new ActionError("The AI is rate-limited right now — try again in a moment.");
+  }
+  return new ActionError(err instanceof Error ? err.message : "The AI request failed.");
+}
 
 export async function requireUser() {
   const supabase = await createClient();
