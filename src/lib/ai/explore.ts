@@ -39,7 +39,9 @@ ${depthGuidance(turnCount)}
 
 This is a chat, not a literature review: reply in at most 3 short paragraphs or a 4-6 item bulleted
 list — a couple hundred words, not a thousand. Pick the single most useful angle rather than covering
-everything.
+everything. Write in plain, normal sentences, like you're talking to the person — not a glossary. Use
+**bold** only for the rare term that truly needs to stand out, not for every key phrase; most sentences
+should have no bold at all.
 
 After your reply, on its own final line, always append a machine-readable suggestion list — even if
 empty — in EXACTLY this format (valid JSON array, 0 to 4 items, no other text on that line). This line
