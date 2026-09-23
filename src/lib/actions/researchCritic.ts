@@ -81,8 +81,8 @@ export async function sendCritiqueMessage(kind: CritiqueSubjectKind, subjectId: 
 
     revalidatePath(`/research/${subject.projectId}/${kind === "hypothesis" ? "hypotheses" : "experiment-plans"}`);
 
-    const { body, topics } = parseExploreResponse(rawText);
-    return { sessionId: session!.id, body, topics, sources };
+    const { body } = parseExploreResponse(rawText);
+    return { sessionId: session!.id, body, sources };
   });
 }
 

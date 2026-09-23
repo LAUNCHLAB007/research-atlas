@@ -1,6 +1,6 @@
 import { chatFormatInstructions, webSearchInstructions } from "./chatShared";
 
-export type { SuggestedTopic, SourceRef } from "./chatShared";
+export type { SourceRef } from "./chatShared";
 export { appendSourcesMarker, parseChatResponse as parseExploreResponse } from "./chatShared";
 
 // Kept out of the (cached) system prompt on purpose: this text changes every few turns, and anything

@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { parseExploreResponse, type SuggestedTopic, type SourceRef } from "@/lib/ai/explore";
+import { parseExploreResponse, type SourceRef } from "@/lib/ai/explore";
 import { ProvenanceBadge } from "@/components/shared/ProvenanceBadge";
 import { MarkdownMessage } from "./MarkdownMessage";
-import { TopicSuggestionCard } from "./TopicSuggestionCard";
 import type { AiMessage } from "@/lib/types/domain";
 import type { ActionResult } from "@/lib/actions/shared";
 
@@ -27,22 +26,9 @@ function toDisplayMessages(messages: AiMessage[]): DisplayMessage[] {
     });
 }
 
-function dedupeTopics(topics: SuggestedTopic[]): SuggestedTopic[] {
-  const seen = new Set<string>();
-  const result: SuggestedTopic[] = [];
-  for (const t of topics) {
-    const key = t.label.trim().toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(t);
-  }
-  return result;
-}
-
 export interface AiChatReply {
   sessionId: string;
   body: string;
-  topics: SuggestedTopic[];
   sources: SourceRef[];
 }
 
@@ -51,7 +37,6 @@ export function AiChatPanel({
   subtitle,
   placeholder,
   emptyStateText,
-  suggestionsLabel,
   initialMessages,
   onSend,
   autoStartMessage,
@@ -60,7 +45,6 @@ export function AiChatPanel({
   subtitle: string;
   placeholder: string;
   emptyStateText: string;
-  suggestionsLabel: string;
   initialMessages: AiMessage[];
   onSend: (text: string) => Promise<ActionResult<AiChatReply>>;
   // If there's no history yet, send this on mount instead of waiting for the user to type a kickoff
@@ -69,13 +53,6 @@ export function AiChatPanel({
   autoStartMessage?: string;
 }) {
   const [messages, setMessages] = useState<DisplayMessage[]>(toDisplayMessages(initialMessages));
-  const [topics, setTopics] = useState<SuggestedTopic[]>(() =>
-    dedupeTopics(
-      initialMessages
-        .filter((m) => m.role === "assistant")
-        .flatMap((m) => parseExploreResponse(m.body).topics)
-    )
-  );
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,9 +76,6 @@ export function AiChatPanel({
       ...prev,
       { id: `assistant-${Date.now()}`, role: "assistant", body: result.data.body, sources: result.data.sources },
     ]);
-    if (result.data.topics.length > 0) {
-      setTopics((prev) => dedupeTopics([...prev, ...result.data.topics]));
-    }
   }
 
   useEffect(() => {
@@ -126,17 +100,6 @@ export function AiChatPanel({
         <h2 className="text-sm font-medium text-text-primary">{title}</h2>
         <p className="text-xs text-text-secondary">{subtitle}</p>
       </div>
-
-      {topics.length > 0 && (
-        <div className="border-b border-border bg-inset/50 px-4 py-3">
-          <p className="mb-2 text-xs font-medium text-text-secondary">{suggestionsLabel}</p>
-          <div className="space-y-1.5">
-            {topics.map((t, i) => (
-              <TopicSuggestionCard key={`${t.label}-${i}`} topic={t} />
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {messages.length === 0 && <p className="text-sm text-text-secondary">{emptyStateText}</p>}

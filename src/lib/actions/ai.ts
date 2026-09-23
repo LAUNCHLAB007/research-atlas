@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import Anthropic from "@anthropic-ai/sdk";
 import { anthropic, EXPLORE_MODEL } from "@/lib/ai/client";
-import { buildExploreSystemPrompt, depthGuidance, parseExploreResponse, appendSourcesMarker, type SuggestedTopic } from "@/lib/ai/explore";
+import { buildExploreSystemPrompt, depthGuidance, parseExploreResponse, appendSourcesMarker } from "@/lib/ai/explore";
 import { buildSuggestQuestionsPrompt, parseQuestionsResponse, levelFromEntryCount } from "@/lib/ai/suggestQuestions";
 import { runCachedChatTurn, logUsage } from "@/lib/ai/chatRequest";
 import { requireUser, runAction, ActionError, toActionError } from "./shared";
@@ -66,22 +66,8 @@ export async function sendExploreMessage(entryId: string, userText: string) {
 
     revalidatePath(`/explore/questions/${entryId}`);
 
-    const { body, topics } = parseExploreResponse(rawText);
-    return { sessionId: session!.id, body, topics, sources };
-  });
-}
-
-export async function addSuggestedTopicToClassroom(topic: SuggestedTopic) {
-  return runAction(async () => {
-    const { supabase } = await requireUser();
-    const { data, error } = await supabase
-      .from("classrooms")
-      .insert({ title: topic.label, learning_goal: topic.description })
-      .select()
-      .single();
-    if (error || !data) throw new ActionError(error?.message ?? "Could not add to Classroom.");
-    revalidatePath("/classroom");
-    return data;
+    const { body } = parseExploreResponse(rawText);
+    return { sessionId: session!.id, body, sources };
   });
 }
 
@@ -132,19 +118,5 @@ export async function saveAndExploreQuestion(questionText: string, domainId: Lea
 
     revalidatePath("/explore");
     return entry;
-  });
-}
-
-export async function addSuggestedTopicToLibrary(topic: SuggestedTopic) {
-  return runAction(async () => {
-    const { supabase } = await requireUser();
-    const { data, error } = await supabase
-      .from("sources")
-      .insert({ kind: "other", title: topic.label, notes: topic.description })
-      .select()
-      .single();
-    if (error || !data) throw new ActionError(error?.message ?? "Could not add to Library.");
-    revalidatePath("/library");
-    return data;
   });
 }

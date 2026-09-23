@@ -2,36 +2,20 @@
 // (Explore with me, Research critic, ...). Keeping this in one place means the marker format can't
 // drift between modes and the parser only has to be trusted once.
 
-const TOPICS_MARKER = "SUGGESTED_TOPICS_JSON:";
 const SOURCES_MARKER = "SOURCES_JSON:";
-
-export interface SuggestedTopic {
-  label: string;
-  description: string;
-}
 
 export interface SourceRef {
   title: string;
   url: string;
 }
 
-// Appended to every mode's system prompt. Keeps replies chat-length and readable, and defines the
-// machine-readable suggestion line every mode's parser expects to find.
+// Appended to every mode's system prompt. Keeps replies chat-length and readable.
 export function chatFormatInstructions(): string {
   return `This is a chat, not a literature review: reply in at most 3 short paragraphs or a 4-6 item bulleted
 list — a couple hundred words, not a thousand. Pick the single most useful angle rather than covering
 everything. Write in plain, normal sentences, like you're talking to the person — not a glossary. Use
 **bold** only for the rare term that truly needs to stand out, not for every key phrase; most sentences
-should have no bold at all.
-
-After your reply, on its own final line, always append a machine-readable suggestion list — even if
-empty — in EXACTLY this format (valid JSON array, 0 to 4 items, no other text on that line). This line
-is required and must fit within your response — leave room for it, do not let the reply above crowd
-it out:
-${TOPICS_MARKER} [{"label": "short topic name", "description": "one sentence on why it matters"}]
-
-Only suggest topics specific and concrete enough that the user could look up a course or a paper on
-them directly — not vague areas.`;
+should have no bold at all.`;
 }
 
 // Same accuracy/grounding rule for every mode that has web_search available.
@@ -53,40 +37,16 @@ export function appendSourcesMarker(text: string, sources: SourceRef[]): string 
   return `${text}\n${SOURCES_MARKER} ${JSON.stringify(sources)}`;
 }
 
-export function parseChatResponse(rawText: string): {
-  body: string;
-  topics: SuggestedTopic[];
-  sources: SourceRef[];
-} {
-  const topicsIndex = rawText.lastIndexOf(TOPICS_MARKER);
-  if (topicsIndex === -1) {
-    return { body: rawText.trim(), topics: [], sources: [] };
+export function parseChatResponse(rawText: string): { body: string; sources: SourceRef[] } {
+  const sourcesIndex = rawText.indexOf(SOURCES_MARKER);
+  if (sourcesIndex === -1) {
+    return { body: rawText.trim(), sources: [] };
   }
 
-  const body = rawText.slice(0, topicsIndex).trim();
-  const afterTopics = rawText.slice(topicsIndex + TOPICS_MARKER.length);
+  const body = rawText.slice(0, sourcesIndex).trim();
+  const sourcesJsonPart = rawText.slice(sourcesIndex + SOURCES_MARKER.length).trim();
 
-  const sourcesIndex = afterTopics.indexOf(SOURCES_MARKER);
-  const topicsJsonPart = (sourcesIndex === -1 ? afterTopics : afterTopics.slice(0, sourcesIndex)).trim();
-  const sourcesJsonPart = sourcesIndex === -1 ? "" : afterTopics.slice(sourcesIndex + SOURCES_MARKER.length).trim();
-
-  return {
-    body,
-    topics: parseTopicsJson(topicsJsonPart),
-    sources: parseSourcesJson(sourcesJsonPart),
-  };
-}
-
-function parseTopicsJson(jsonPart: string): SuggestedTopic[] {
-  try {
-    const parsed = JSON.parse(jsonPart);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((t): t is SuggestedTopic => t && typeof t.label === "string" && typeof t.description === "string")
-      .slice(0, 4);
-  } catch {
-    return [];
-  }
+  return { body, sources: parseSourcesJson(sourcesJsonPart) };
 }
 
 function parseSourcesJson(jsonPart: string): SourceRef[] {

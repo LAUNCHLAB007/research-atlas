@@ -46,7 +46,6 @@ export function CritiqueButton({ kind, subjectId }: { kind: CritiqueSubjectKind;
           subtitle="AI-generated. A critique to work from, not a verdict."
           placeholder="Push back, or ask what would fix this…"
           emptyStateText="Starting a critique — this may take a moment while it checks for existing work on this."
-          suggestionsLabel="Worth reading, from this critique"
           initialMessages={initialMessages}
           onSend={(text) => sendCritiqueMessage(kind, subjectId, text)}
           autoStartMessage={`Please critique this ${kind === "hypothesis" ? "hypothesis" : "experiment plan"}.`}
