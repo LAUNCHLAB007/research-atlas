@@ -47,7 +47,7 @@ export default async function ResearchProjectSectionPage({
           <InlineStatusSelect
             value={project.status}
             options={RESEARCH_STATUSES}
-            onChange={(status) => setResearchStatus(project.id, status)}
+            onChange={setResearchStatus.bind(null, project.id)}
           />
         </div>
       </div>

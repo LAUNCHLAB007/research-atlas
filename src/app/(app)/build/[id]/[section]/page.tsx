@@ -41,7 +41,7 @@ export default async function BuildProjectSectionPage({
           <InlineStatusSelect
             value={project.status}
             options={BUILD_STATUSES}
-            onChange={(status) => setBuildProjectStatus(project.id, status)}
+            onChange={setBuildProjectStatus.bind(null, project.id)}
           />
         </div>
       </div>
