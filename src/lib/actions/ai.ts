@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import Anthropic from "@anthropic-ai/sdk";
 import { anthropic, EXPLORE_MODEL } from "@/lib/ai/client";
 import { buildExploreSystemPrompt, parseExploreResponse, type SuggestedTopic } from "@/lib/ai/explore";
-import { buildSuggestQuestionsPrompt, parseQuestionsResponse } from "@/lib/ai/suggestQuestions";
+import { buildSuggestQuestionsPrompt, parseQuestionsResponse, levelFromEntryCount } from "@/lib/ai/suggestQuestions";
 import { requireUser, runAction, ActionError } from "./shared";
 import { getExploreSessionForEntry, listMessages } from "@/lib/data/ai";
 import { getEntry } from "@/lib/data/entries";
 import { ensureRootTopic } from "./explore";
 import { domainById } from "@/lib/constants/domains";
+import { countEntriesInDomain } from "@/lib/data/topics";
 import type { AiSession, LearningDomainId } from "@/lib/types/domain";
 
 function toActionError(err: unknown): ActionError {
@@ -62,7 +63,7 @@ export async function sendExploreMessage(entryId: string, userText: string) {
         model: EXPLORE_MODEL,
         max_tokens: 4096,
         output_config: { effort: "medium" },
-        system: buildExploreSystemPrompt(entry.original_body),
+        system: buildExploreSystemPrompt(entry.original_body, priorMessages.length),
         messages: history,
       });
     } catch (err) {
@@ -108,6 +109,8 @@ export async function suggestDomainQuestions(domainId: LearningDomainId) {
   return runAction(async () => {
     await requireUser();
     const domain = domainById(domainId);
+    const entryCount = await countEntriesInDomain(domainId);
+    const level = levelFromEntryCount(entryCount);
 
     let response;
     try {
@@ -115,7 +118,7 @@ export async function suggestDomainQuestions(domainId: LearningDomainId) {
         model: EXPLORE_MODEL,
         max_tokens: 1024,
         output_config: { effort: "medium" },
-        messages: [{ role: "user", content: buildSuggestQuestionsPrompt(domain.name, domain.description) }],
+        messages: [{ role: "user", content: buildSuggestQuestionsPrompt(domain.name, domain.description, level) }],
       });
     } catch (err) {
       throw toActionError(err);
@@ -128,7 +131,7 @@ export async function suggestDomainQuestions(domainId: LearningDomainId) {
 
     const questions = parseQuestionsResponse(rawText);
     if (questions.length === 0) throw new ActionError("Could not generate suggestions — try again.");
-    return questions;
+    return { questions, level };
   });
 }
 
